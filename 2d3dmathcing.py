@@ -4,6 +4,7 @@ import numpy as np
 import random
 import cv2
 import time
+import itertools
 import open3d as o3d
 
 from tqdm import tqdm
@@ -65,39 +66,40 @@ def World2Plane(world_pts, r, t, K, distCoeffs):
     v = K[1,1]*y_dist + K[1,2]
     return np.vstack([u, v]).T #(points number, 2)
 
-def procrustes_alignment(X, Y):
-    """
-    Kabsch algorithm:
-    X: (N,3) world points
-    Y: (N,3) camera points
-    return: r, t
-    """
-    Xc = X.mean(0)
-    Yc = Y.mean(0)
-    Xn = X - Xc
-    Yn = Y - Yc
-
-    H = Xn.T @ Yn
-    U, S, Vt = np.linalg.svd(H)
-    r = Vt.T @ U.T
-    if np.linalg.det(r) < 0:
-        Vt[-1,:] *= -1
-        r = Vt.T @ U.T
-    t = Yc - r @ Xc
-    return r, t
 
 def p3p_solver(world_pts, cam_dirs):
+
+    poses = []
+
+    reindex = None
+    perms = list(itertools.permutations([0,1,2]))
+
+    for perm in perms:
+        i1,i2,i3 = perm
+        if np.dot(cam_dirs[i1],cam_dirs[i3]) <= np.dot(cam_dirs[i1],cam_dirs[i2]) and np.dot(cam_dirs[i1],cam_dirs[i2]) <= np.dot(cam_dirs[i2],cam_dirs[i3]):
+            reindex = list(perm)
+            break
     
-    X1, X2, X3 = world_pts 
-    m1, m2, m3 = cam_dirs
+    m1, m2, m3 = cam_dirs[reindex]
+    
     m12 = np.dot(m1,m2)
     m13 = np.dot(m1,m3)
     m23 = np.dot(m2,m3)
-    s12 = np.linalg.norm(X2 - X1) 
-    s23 = np.linalg.norm(X3 - X2) 
-    s13 = np.linalg.norm(X3 - X1)
 
-    c4 = - s12**2 + 2*s12*s13 + 2*s12*s23 - s13**2 \
+    X1, X2, X3 = world_pts[reindex]
+    X1 = X1.reshape(1,3)
+    X2 = X2.reshape(1,3)
+    X3 = X3.reshape(1,3)
+    
+    m1 = m1.reshape(1,3)
+    m2 = m2.reshape(1,3)
+    m3 = m3.reshape(1,3)
+
+    s12 = np.sum((X1-X2)**2)
+    s23 = np.sum((X2-X3)**2)
+    s13 = np.sum((X1-X3)**2)
+
+    c4 = -s12**2 + 2*s12*s13 + 2*s12*s23 - s13**2 \
         + 4*s13*s23*m12**2 - 2*s13*s23 - s23**2
     c3 = 4*s12**2*m13 - 4*s12*s13*m12*m23 - 4*s12*s13*m13\
         - 8*s12*s23*m13 + 4*s13**2*m12*m23\
@@ -113,9 +115,30 @@ def p3p_solver(world_pts, cam_dirs):
         - 8*s12*s23*m13 + 4*s13**2*m12*m23\
         - 4*s13*s23*m12*m23 - 4*s13*s23*m13\
         + 4*s23**2*m13
-    c0 = - s12**2 + 4*s12*s13*m23**2 - 2*s12*s13\
+    c0 = -s12**2 + 4*s12*s13*m23**2 - 2*s12*s13\
         + 2*s12*s23 - s13**2 + 2*s13*s23 - s23**2
+    coeffs = [c4, c3, c2, c1, c0]
+    roots = np.roots(coeffs)
+    roots = [r.real for r in roots if np.isreal(r) and r.real > 0]
+    A = -s12+s23+s13
+    B = 2*(s12-s23)*m13
+    C = -s12+s23-s13
     
+    for x in roots:
+        y = (A*x**2 + B*x + C) / (2*s13*(m12*x - m23))
+        if y>0:
+            d3 = np.sqrt(s12/(x**2-2*x*y*m12+y**2))
+            d1 = x*d3
+            d2 = y*d3
+            X = np.hstack([X1.T - X2.T , X1.T - X3.T , np.cross(X1-X2,X1-X3).T])
+            Y1 = d1*m1 - d2*m2
+            Y2 = d1*m1 - d3*m3
+            Y = np.hstack([Y1.T,Y2.T,np.cross(Y1,Y2).T])
+            r = Y @ np.linalg.inv(X)
+            t = d1*m1.T - r@X1.T
+            poses.append((r,t))
+    return poses
+
 
 
 def ransac_p3p(world_pts, image_pts, K, distCoeffs,
@@ -132,10 +155,11 @@ def ransac_p3p(world_pts, image_pts, K, distCoeffs,
         sols = p3p_solver(world_pts[idx], dirs[idx])#fit
         if len(sols) == 0:
             continue
+        
         for r, t in sols:
             proj = World2Plane(world_pts, r, t, K, distCoeffs)
             err = np.linalg.norm(proj - image_pts, axis=1)
-            inliers = np.where(err < threshold)[0]#threshold d 
+            inliers = np.where(err < threshold)[0]#threshold d
             if len(inliers) >= N*confidence:#good fit
                 err = np.mean(np.linalg.norm(proj[inliers] - image_pts[inliers], axis=1))
                 if err<best_error:
@@ -173,11 +197,11 @@ def pnpsolver(query,model,cameraMatrix=0,distortion=0):
     pointsmodel = np.array([kp_model[m.trainIdx] for m in good_matches])
 
 
-    return cv2.solvePnPRansac(
-        pointsmodel, pointsquery, cameraMatrix, distCoeffs,
-        iterationsCount=100, reprojectionError=8.0, confidence=0.99
-    )
-    #return ransac_p3p(pointsmodel, pointsquery, cameraMatrix, distCoeffs)
+    # return cv2.solvePnPRansac(
+    #     pointsmodel, pointsquery, cameraMatrix, distCoeffs,
+    #     iterationsCount=100, reprojectionError=8.0, confidence=0.99
+    # )
+    return ransac_p3p(pointsmodel, pointsquery, cameraMatrix, distCoeffs)
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
