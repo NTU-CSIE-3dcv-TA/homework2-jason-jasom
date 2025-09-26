@@ -177,7 +177,7 @@ def ransac_p3p(world_pts, image_pts, K, distCoeffs,
 
     return True, rvec, tvec, inliers
 
-def pnpsolver(query,model,cameraMatrix=0,distortion=0):
+def pnpsolver(query,model,cameraMatrix=0,distortion=0,self_flag = False):
     kp_query, desc_query = query
     kp_model, desc_model = model
     cameraMatrix = np.array([[1868.27,0,540],[0,1869.18,960],[0,0,1]])
@@ -196,11 +196,11 @@ def pnpsolver(query,model,cameraMatrix=0,distortion=0):
     pointsquery = np.array([kp_query[m.queryIdx] for m in good_matches])
     pointsmodel = np.array([kp_model[m.trainIdx] for m in good_matches])
 
-
-    # return cv2.solvePnPRansac(
-    #     pointsmodel, pointsquery, cameraMatrix, distCoeffs,
-    #     iterationsCount=100, reprojectionError=8.0, confidence=0.99
-    # )
+    if not self_flag:
+        return cv2.solvePnPRansac(
+            pointsmodel, pointsquery, cameraMatrix, distCoeffs,
+            iterationsCount=100, reprojectionError=8.0, confidence=0.99
+        )
     return ransac_p3p(pointsmodel, pointsquery, cameraMatrix, distCoeffs)
 #-----------------------------------------------------------------------------
 
@@ -384,7 +384,7 @@ if __name__ == "__main__":
         desc_query = np.array(points["DESCRIPTORS"].to_list()).astype(np.float32)
 
         # Find correspondance and solve pnp
-        retval, rvec, tvec, inliers = pnpsolver((kp_query, desc_query), (kp_model, desc_model))
+        retval, rvec, tvec, inliers = pnpsolver((kp_query, desc_query), (kp_model, desc_model),self_flag=False)
         if not retval:
             continue
         rotq = R.from_rotvec(rvec.reshape(1,3)).as_quat() # Convert rotation vector to quaternion
