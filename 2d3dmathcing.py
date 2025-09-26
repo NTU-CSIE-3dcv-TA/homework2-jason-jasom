@@ -97,7 +97,7 @@ def p3p_solver(world_pts, cam_dirs):
     s23 = np.linalg.norm(X3 - X2) 
     s13 = np.linalg.norm(X3 - X1)
 
-    c4 = -s12**2 + 2*s12*s13 + 2*s12*s23 - s13**2 \
+    c4 = - s12**2 + 2*s12*s13 + 2*s12*s23 - s13**2 \
         + 4*s13*s23*m12**2 - 2*s13*s23 - s23**2
     c3 = 4*s12**2*m13 - 4*s12*s13*m12*m23 - 4*s12*s13*m13\
         - 8*s12*s23*m13 + 4*s13**2*m12*m23\
@@ -113,9 +113,9 @@ def p3p_solver(world_pts, cam_dirs):
         - 8*s12*s23*m13 + 4*s13**2*m12*m23\
         - 4*s13*s23*m12*m23 - 4*s13*s23*m13\
         + 4*s23**2*m13
-    c0 = -s12**2 + 4*s12*s13*m23**2 - 2*s12*s13\
+    c0 = - s12**2 + 4*s12*s13*m23**2 - 2*s12*s13\
         + 2*s12*s23 - s13**2 + 2*s13*s23 - s23**2
-    return []
+    
 
 
 def ransac_p3p(world_pts, image_pts, K, distCoeffs,
@@ -342,8 +342,8 @@ if __name__ == "__main__":
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter("Q2-2video.mp4", fourcc, 5, (rimg.shape[1],rimg.shape[0]))
 
-    IMAGE_ID_LIST = [1,2,3]
-    #IMAGE_ID_LIST = [i for i in range(1,131)]
+    #IMAGE_ID_LIST = [1,2,3]
+    IMAGE_ID_LIST = [i for i in range(1,131)]
     r_list = []
     t_list = []
     rotation_error_list = []
