@@ -76,7 +76,8 @@ def p3p_solver(world_pts, cam_dirs):
 
     for perm in perms:
         i1,i2,i3 = perm
-        if np.dot(cam_dirs[i1],cam_dirs[i3]) <= np.dot(cam_dirs[i1],cam_dirs[i2]) and np.dot(cam_dirs[i1],cam_dirs[i2]) <= np.dot(cam_dirs[i2],cam_dirs[i3]):
+        if np.dot(cam_dirs[i1],cam_dirs[i3]) <= np.dot(cam_dirs[i1],cam_dirs[i2]) \
+            and np.dot(cam_dirs[i1],cam_dirs[i2]) <= np.dot(cam_dirs[i2],cam_dirs[i3]):
             reindex = list(perm)
             break
     
@@ -142,7 +143,7 @@ def p3p_solver(world_pts, cam_dirs):
 
 
 def ransac_p3p(world_pts, image_pts, K, distCoeffs,
-               iterations=1000, threshold=3.0, confidence=0.99):
+               iterations=100, threshold=8, confidence=0.99):
     
     best_inliers = []
     best_pose = None
@@ -256,8 +257,8 @@ def visualization(Camera2World_Transform_Matrixs, points3D_df):
     vis.add_geometry(pcd)
 
     # load axes
-    # axes = load_axes()
-    # vis.add_geometry(axes)
+    axes = load_axes()
+    vis.add_geometry(axes)
     s = 0.05
     f = 0.1
     track = []
@@ -294,11 +295,11 @@ def visualization(Camera2World_Transform_Matrixs, points3D_df):
     trackline.paint_uniform_color([0, 0, 0])
     vis.add_geometry(trackline)
 
-
     # just set a proper initial camera view
     vc = vis.get_view_control()
     vc_cam = vc.convert_to_pinhole_camera_parameters()
-    initial_cam = get_transform_mat(np.array([7.227, -16.950, -14.868]), np.array([-0.351, 1.036, 5.132]), 1)
+    initial_cam = get_transform_mat(np.array([7.227, -16.950, -14.868])\
+                                , np.array([-0.351, 1.036, 5.132]), 1)
     initial_cam = np.concatenate([initial_cam, np.zeros([1, 4])], 0)
     initial_cam[-1, -1] = 1.
     setattr(vc_cam, 'extrinsic', initial_cam)
@@ -372,6 +373,7 @@ if __name__ == "__main__":
     t_list = []
     rotation_error_list = []
     translation_error_list = []
+    self_flag = True
     for i in tqdm(IMAGE_ID_LIST):
         # Load quaery image
         fname = f"valid_img{i*5}.jpg"
@@ -384,7 +386,7 @@ if __name__ == "__main__":
         desc_query = np.array(points["DESCRIPTORS"].to_list()).astype(np.float32)
 
         # Find correspondance and solve pnp
-        retval, rvec, tvec, inliers = pnpsolver((kp_query, desc_query), (kp_model, desc_model),self_flag=False)
+        retval, rvec, tvec, inliers = pnpsolver((kp_query, desc_query), (kp_model, desc_model),self_flag=self_flag)
         if not retval:
             continue
         rotq = R.from_rotvec(rvec.reshape(1,3)).as_quat() # Convert rotation vector to quaternion
