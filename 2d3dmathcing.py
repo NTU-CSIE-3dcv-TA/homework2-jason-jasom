@@ -291,7 +291,7 @@ def visualization(Camera2World_Transform_Matrixs, points3D_df):
         points=o3d.utility.Vector3dVector(track),
         lines=o3d.utility.Vector2iVector(track_lines),
     )
-    trackline.paint_uniform_color([0, 1, 0])
+    trackline.paint_uniform_color([0, 0, 0])
     vis.add_geometry(trackline)
 
 
