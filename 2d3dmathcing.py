@@ -131,6 +131,19 @@ def p3p_solver(world_pts, cam_dirs):
             d3 = np.sqrt(s12/(x**2-2*x*y*m12+y**2))
             d1 = x*d3
             d2 = y*d3
+
+            for _ in range(5):
+                fd = np.array([d1**2+d2**2-2*d1*d2*m12-s12,\
+                    d1**2+d3**2-2*d1*d3*m13-s13,\
+                    d2**2+d3**2-2*d2*d3*m23-s23])
+                
+                J = np.array([[2*d1 - 2*d2*m12, 2*d2 - 2*d1*m12, 0],
+                            [2*d1 - 2*d3*m13, 0, 2*d3 - 2*d1*m13],
+                            [0, 2*d2 - 2*d3*m23, 2*d3 - 2*d2*m23]])
+                
+                dd = -np.linalg.inv(J.T @ J) @ J.T @ fd.reshape((3,1))
+                d1,d2,d3 = np.array([d1,d2,d3]) + dd.reshape(3)
+
             X = np.hstack([X1.T - X2.T , X1.T - X3.T , np.cross(X1-X2,X1-X3).T])
             Y1 = d1*m1 - d2*m2
             Y2 = d1*m1 - d3*m3
