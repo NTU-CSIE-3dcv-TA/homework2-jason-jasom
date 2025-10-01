@@ -226,7 +226,7 @@ def rotation_error(R1, R2):
     R2 = R.from_quat(R2)
     R_rel = R1 * R2.inv()
     rotvecs = R_rel.as_rotvec()
-    return np.median(rotvecs)
+    return np.median(np.abs(rotvecs))
 
 def translation_error(t1, t2):
     #TODO: calculate translation error
